@@ -51,7 +51,7 @@ exports.logout = (req, res, next) => {
   res.redirect("/users/login");
 };
 
-exports.createUser = async (req, res) => {
+exports.createUser = async (req, res, next) => {
   const errors = [];
   try {
     await User.userValidation(req.body);
@@ -60,13 +60,10 @@ exports.createUser = async (req, res) => {
 
     if (user) {
       errors.push({
+        name: "email",
         message: "ایمیل وارد شده تکراری می باشد",
       });
-      return res.render("register", {
-        pageTitle: "ثبت نام کاربر",
-        path: "/register",
-        errors,
-      });
+      throw errors;
     }
 
     const hash = await bcrypt.hash(password, 10);
@@ -76,11 +73,7 @@ exports.createUser = async (req, res) => {
       password: hash,
     });
 
-    //await User.create(req.body);
-
-    req.flash("success_msg", "ثبت نام با موفقیت انجام شد");
-
-    res.redirect("/users/login");
+    res.status(201).json({ message: "ثبت نام با موفقیت انجام شد" });
   } catch (err) {
     if (err.inner) {
       err.inner.forEach((e) => {
@@ -89,18 +82,12 @@ exports.createUser = async (req, res) => {
           message: e.message,
         });
       });
-    } else {
-      console.log(err);
-      errors.push({
-        message: "خطایی رخ داده است",
-      });
     }
+    const error = new Error("خطا در اعتبار سنجی");
+    error.statusCode = 422;
+    error.data = errors;
 
-    return res.render("register", {
-      pageTitle: "ثبت نام کاربر",
-      path: "/register",
-      errors,
-    });
+    next(error);
   }
 };
 
