@@ -15,12 +15,14 @@ const transporterDetails = smtpTransport({
 });
 
 exports.sendEmail = (email, fullname, subject, message) => {
-  const transporter = nodeMailer.createTransport(transporterDetails);
-  transporter.sendMail({
-    from: "toplearn@ghorbany.dev",
-    to: email,
-    subject: subject,
-    html: `<h1> سلام ${fullname}</h1>
-            <p>${message}</p>`,
-  });
+  try {
+    const transporter = nodeMailer.createTransport(transporterDetails);
+    transporter.sendMail({
+      from: "toplearn@ghorbany.dev",
+      to: email,
+      subject: subject,
+      html: `<h1> سلام ${fullname}</h1>
+              <p>${message}</p>`,
+    });
+  } catch (error) {}
 };

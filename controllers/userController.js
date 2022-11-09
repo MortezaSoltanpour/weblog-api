@@ -40,17 +40,6 @@ exports.handleLogin = async (req, res, next) => {
   }
 };
 
-exports.logout = (req, res, next) => {
-  req.logout(function (err) {
-    if (err) {
-      return next(err);
-    }
-  });
-  req.session = null;
-  //req.flash("success_msg", "خروج موفقیت آمیز بود");
-  res.redirect("/users/login");
-};
-
 exports.createUser = async (req, res, next) => {
   const errors = [];
   try {
@@ -91,106 +80,72 @@ exports.createUser = async (req, res, next) => {
   }
 };
 
-exports.forgetPasswrod = async (req, res) => {
-  res.render("forgetPass", {
-    pageTitle: "فراموشی رمز عبور",
-    path: "/login",
-    message: req.flash("success_msg"),
-    error: req.flash("error"),
-  });
-};
-
-exports.handleForgetPassword = async (req, res) => {
+exports.handleForgetPassword = async (req, res, next) => {
   const { email } = req.body;
 
-  const user = await User.findOne({ email: email });
+  try {
+    const user = await User.findOne({ email: email });
 
-  if (!user) {
-    req.flash("error", "کاربری با ایمیل در پایگاه داده ثبت نیست");
+    if (!user) {
+      const error = new Error("کاربری با ایمیل در پایگاه داده ثبت نشده");
+      error.statusCode = 404;
+      throw error;
+    }
 
-    return res.render("forgetPass", {
-      pageTitle: "فراموشی رمز عبور",
-      path: "/login",
-      message: req.flash("success_msg"),
-      error: req.flash("error"),
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
     });
-  }
+    const resetLink = `http://localhost:3000/users/reset-password/${token}`;
 
-  const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
-  });
-  const resetLink = `http://localhost:3000/users/reset-password/${token}`;
-
-  console.log(resetLink);
-  sendEmail(
-    user.email,
-    user.fullname,
-    "فراموشی رمز عبور",
-    `
+    sendEmail(
+      user.email,
+      user.fullname,
+      "فراموشی رمز عبور",
+      `
       جهت تغییر رمز عبور فعلی رو لینک زیر کلیک کنید
       <a href="${resetLink}">لینک تغییر رمز عبور</a>
   `
-  );
+    );
 
-  req.flash("success_msg", "ایمیل حاوی لینک با موفقیت ارسال شد");
-
-  res.render("forgetPass", {
-    pageTitle: "فراموشی رمز عبور",
-    path: "/login",
-    message: req.flash("success_msg"),
-    error: req.flash("error"),
-  });
+    res.status(200).json({
+      message: "لینک ریست کلمه عبور با موفقیت ارسال شد",
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
-exports.resetPassword = async (req, res) => {
+exports.handleResetPassword = async (req, res, next) => {
   const token = req.params.token;
-
-  let decodedToken;
+  const { password, confirmPassword } = req.body;
 
   try {
-    decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    console.log(decodedToken);
-  } catch (err) {
-    console.log(err);
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
     if (!decodedToken) {
-      return res.redirect("/404");
+      const error = new Error("شما مجوز این عملیات را ندارید");
+      error.statusCode = 401;
+      throw error;
     }
+
+    if (password !== confirmPassword) {
+      const error = new Error("کلمه های عبور یکسان نمی باشند");
+      error.statusCode = 422;
+      throw error;
+    }
+
+    const user = await User.findOne({ _id: decodedToken.userId });
+
+    if (!user) {
+      const error = new Error("کاربری با این شناسه در پایگاه داده یافت نشد");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    user.password = password;
+    await user.save();
+
+    res.status(200).json({ message: "عملیات با موفقیت انجام شد" });
+  } catch (err) {
+    next(err);
   }
-
-  res.render("resetPass", {
-    pageTitle: "تغییر پسورد",
-    path: "/login",
-    message: req.flash("success_msg"),
-    error: req.flash("error"),
-    userId: decodedToken.userId,
-  });
-};
-
-exports.handleResetPassword = async (req, res) => {
-  const { password, confirmPassword } = req.body;
-  console.log(password, confirmPassword);
-
-  if (password !== confirmPassword) {
-    req.flash("error", "کلمه های عبور یاکسان نیستند");
-
-    return res.render("resetPass", {
-      pageTitle: "تغییر پسورد",
-      path: "/login",
-      message: req.flash("success_msg"),
-      error: req.flash("error"),
-      userId: req.params.id,
-    });
-  }
-
-  const user = await User.findOne({ _id: req.params.id });
-
-  if (!user) {
-    return res.redirect("/404");
-  }
-
-  user.password = password;
-  await user.save();
-
-  req.flash("success_msg", "پسورد شما با موفقیت بروزرسانی شد");
-  res.redirect("/users/login");
 };

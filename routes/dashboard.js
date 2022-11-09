@@ -4,18 +4,6 @@ const adminController = require("../controllers/adminController");
 
 const router = new Router();
 
-//  @desc   Dashboard
-//  @route  GET /dashboard
-router.get("/", authenticated, adminController.getDashboard);
-
-//  @desc   Dashboard Add Post
-//  @route  GET /dashboard/add-post
-router.get("/add-post", authenticated, adminController.getAddPost);
-
-//  @desc   Dashboard Edit Post
-//  @route  GET /dashboard/edit-post/:id
-router.get("/edit-post/:id", authenticated, adminController.getEditPost);
-
 //  @desc   Dashboard Delete Post
 //  @route  GET /dashboard/delete-post/:id
 router.get("/delete-post/:id", authenticated, adminController.deletePost);
